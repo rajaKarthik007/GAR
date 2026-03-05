@@ -1,0 +1,8 @@
+{"question": "What is 2+2?", "answer": "4", "reasoning": "First, I need to add 2 and 2 together. Since 2+2 equals 4 by basic arithmetic, the answer is 4."}
+{"question": "Compute 999+1.", "answer": "1000", "reasoning": "To compute 999+1, I add 1 to 999. Therefore, 999+1=1000."}
+{"question": "What is 37*12?", "answer": "444", "reasoning": "I need to multiply 37 by 12. Breaking it down: 37*10=370 and 37*2=74. So 370+74=444."}
+{"question": "Compute 144/12.", "answer": "12", "reasoning": "Dividing 144 by 12: since 12*12=144, the answer is 12."}
+{"question": "Evaluate 3^4.", "answer": "81", "reasoning": "3^4 = 3*3*3*3. First 3*3=9, then 9*3=27, then 27*3=81. Therefore, 3^4=81."}
+{"question": "Evaluate 2^10.", "answer": "1024", "reasoning": "2^10 = 1024. We can compute: 2^1=2, 2^2=4, 2^3=8, 2^4=16, 2^5=32, 2^6=64, 2^7=128, 2^8=256, 2^9=512, 2^10=1024."}
+{"question": "What is 5!?", "answer": "120", "reasoning": "5! = 5*4*3*2*1 = 120. Computing step by step: 5*4=20, 20*3=60, 60*2=120, 120*1=120."}
+{"question": "Compute gcd(54,24).", "answer": "6", "reasoning": "Using the Euclidean algorithm: gcd(54,24). 54 = 2*24 + 6. Then gcd(24,6). 24 = 4*6 + 0. So gcd(54,24)=6."}

@@ -1,0 +1,17 @@
+README.md
+pyproject.toml
+src/gar/__init__.py
+src/gar/config.py
+src/gar/data.py
+src/gar/modeling.py
+src/gar/openai_labeler.py
+src/gar/parsing.py
+src/gar/prompts.py
+src/gar/rewards.py
+src/gar/slicing.py
+src/gar/utils.py
+src/gar_repro.egg-info/PKG-INFO
+src/gar_repro.egg-info/SOURCES.txt
+src/gar_repro.egg-info/dependency_links.txt
+src/gar_repro.egg-info/requires.txt
+src/gar_repro.egg-info/top_level.txt

@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Model checkpoints (large binary files — save to SCRATCH on the cluster)
+checkpoints/
+
+# Generated SFT data for paper-scale runs (built on the cluster, can be large)
+data/discriminator_sft.jsonl
+
+# Cluster job logs
+logs/
+*.log
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDEs
+.vscode/
+.idea/
+
+# Claude Code internal
+.claude/

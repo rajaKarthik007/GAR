@@ -1,0 +1,77 @@
+seed: 42
+
+runtime:
+  # MACBOOK_PROFILE (default): tuned to run locally on Apple Silicon with MPS.
+  # FULL_SCALE_REVERT: use configs/qwen_gar_paper.yaml for paper-style settings.
+  profile: macbook
+  device: auto
+  dtype: float16
+  trust_remote_code: false
+  use_mps_if_available: true
+  sft_use_fp16: false
+  sft_use_bf16: false
+
+models:
+  # MACBOOK_PROFILE: use small models that fit local memory.
+  # FULL_SCALE_REVERT: deepseek-ai/DeepSeek-R1-Distill-Qwen-7B and -1.5B.
+  reasoner_name: Qwen/Qwen2.5-0.5B-Instruct
+  discriminator_name: Qwen/Qwen2.5-0.5B-Instruct
+  reasoner_output_dir: checkpoints/reasoner_local
+  discriminator_output_dir: checkpoints/discriminator_local
+
+data:
+  dataset_name: open-r1/OpenR1-Math-220k
+  dataset_config: null
+  train_split: train
+  eval_split: test
+  # For local smoke-testing, use the bundled local JSONL to avoid downloading the full dataset.
+  # Set to null and use dataset_name for the full OpenR1-Math-220k.
+  local_jsonl: data/train_local.jsonl
+  question_key_candidates: [question, problem, prompt, instruction]
+  answer_key_candidates: [answer, final_answer, solution]
+  reasoning_key_candidates: [cot, reasoning, thought, deepseek_thinking_trajectory]
+  sft_sample_ratio: 0.005
+  sft_output_path: data/discriminator_sft_local.jsonl
+  max_train_examples: 512
+  max_eval_examples: 128
+
+slicing:
+  # Kept paper-like; you can reduce this further for speed.
+  max_slice_tokens: 320
+  min_slice_tokens: 48
+  semantic_break_markers: ["Therefore", "Thus", "Hence", "So", "Next", "Finally"]
+
+training:
+  # MACBOOK_PROFILE: tiny settings for smoke/local runs.
+  # FULL_SCALE_REVERT: see qwen_gar_paper.yaml.
+  # Reduced for MPS memory constraints (two models in memory simultaneously).
+  max_reasoner_tokens: 128
+  max_discriminator_tokens: 64
+  num_generations: 2
+  per_device_batch_size: 1
+  gradient_accumulation_steps: 1
+  max_steps: 20
+  learning_rate: 1.0e-6
+  min_learning_rate: 5.0e-7
+  warmup_ratio: 0.1
+  weight_decay: 1.0e-4
+  max_grad_norm: 1.0
+
+sft:
+  per_device_batch_size: 1
+  gradient_accumulation_steps: 1
+  max_steps: 30
+  learning_rate: 5.0e-5
+  warmup_steps: 5
+  weight_decay: 1.0e-4
+  max_seq_length: 512
+
+reward:
+  lambda1_exact_match: 1.0
+  lambda2_slice: 1.0
+  lambda3_disc: 1.0
+  lambda4_align: 0.5
+
+logging:
+  log_every: 5
+  save_every: 20

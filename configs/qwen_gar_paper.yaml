@@ -1,0 +1,71 @@
+seed: 42
+
+runtime:
+  # FULL_SCALE_REVERT: paper-like runtime profile.
+  profile: paper
+  device: auto
+  dtype: bfloat16
+  trust_remote_code: false
+  use_mps_if_available: false
+  sft_use_fp16: false
+  sft_use_bf16: true
+
+models:
+  # FULL_SCALE_REVERT: models from GAR Qwen variant.
+  reasoner_name: deepseek-ai/DeepSeek-R1-Distill-Qwen-7B
+  discriminator_name: deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
+  reasoner_output_dir: checkpoints/reasoner
+  discriminator_output_dir: checkpoints/discriminator
+
+data:
+  dataset_name: open-r1/OpenR1-Math-220k
+  dataset_config: null
+  train_split: train
+  eval_split: test
+  local_jsonl: null
+  question_key_candidates: [question, problem, prompt, instruction]
+  answer_key_candidates: [answer, final_answer, solution]
+  reasoning_key_candidates: [cot, reasoning, thought, deepseek_thinking_trajectory]
+  sft_sample_ratio: 0.10
+  sft_output_path: data/discriminator_sft.jsonl
+  max_train_examples: null
+  max_eval_examples: null
+
+slicing:
+  max_slice_tokens: 320
+  min_slice_tokens: 48
+  semantic_break_markers: ["Therefore", "Thus", "Hence", "So", "Next", "Finally"]
+
+training:
+  # Paper hyperparameters: global batch 192 on 8 H100 GPUs.
+  # per_device_batch_size(1) * gradient_accumulation_steps(24) * 8 GPUs = 192.
+  max_reasoner_tokens: 2048
+  max_discriminator_tokens: 128
+  num_generations: 4
+  per_device_batch_size: 1
+  gradient_accumulation_steps: 24
+  max_steps: 400
+  learning_rate: 1.0e-6
+  min_learning_rate: 5.0e-7
+  warmup_ratio: 0.1
+  weight_decay: 1.0e-4
+  max_grad_norm: 1.0
+
+sft:
+  per_device_batch_size: 4
+  gradient_accumulation_steps: 4
+  max_steps: 500
+  learning_rate: 1.0e-4
+  warmup_steps: 100
+  weight_decay: 1.0e-4
+  max_seq_length: 1024
+
+reward:
+  lambda1_exact_match: 1.0
+  lambda2_slice: 1.0
+  lambda3_disc: 1.0
+  lambda4_align: 0.5
+
+logging:
+  log_every: 10
+  save_every: 50
