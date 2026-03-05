@@ -15,6 +15,8 @@
 #   cd $SCRATCH/gar && sbatch scripts/slurm/05_eval.sh
 
 export HF_HOME="$SCRATCH/hf_cache"
+export TRANSFORMERS_OFFLINE=1
+export HF_DATASETS_OFFLINE=1
 
 ml purge
 ml GCCcore/13.3.0

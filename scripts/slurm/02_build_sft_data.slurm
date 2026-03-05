@@ -15,6 +15,8 @@
 # REQUIRES: TAMUS_AI_CHAT_API_KEY exported in your ~/.bashrc on the cluster.
 
 export HF_HOME="$SCRATCH/hf_cache"
+export TRANSFORMERS_OFFLINE=1
+export HF_DATASETS_OFFLINE=1
 
 ml purge
 ml GCCcore/13.3.0
