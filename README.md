@@ -287,24 +287,35 @@ ls $SCRATCH/hf_cache/models--deepseek-ai--DeepSeek-R1-Distill-Qwen-7B/
 
 ### Step 2: Build Discriminator SFT Data
 
+> **Run on the login node, not as a SLURM job.** This step calls the TAMUS AI API over the internet; compute nodes on FASTER do not have outbound internet access. The script needs no GPU — it is CPU-only.
+
+Use `screen` or `tmux` so the job survives if your SSH session drops:
+
 ```bash
+screen -S sft_build   # start a persistent session
+
 cd $SCRATCH/gar
-sbatch scripts/slurm/02_build_sft_data.slurm
+export HF_HOME="$SCRATCH/hf_cache"
+export TRANSFORMERS_OFFLINE=1
+export HF_DATASETS_OFFLINE=1
+
+$SCRATCH/conda_envs/gar_env/bin/python scripts/build_discriminator_sft_data.py \
+    --config configs/qwen_gar_paper.yaml \
+    --api_base https://chat-api.tamu.ai/api \
+    --api_key_env TAMUS_AI_CHAT_API_KEY \
+    --openai_model protected.o4-mini \
+    2>&1 | tee logs/sft_build_$(date +%Y%m%d_%H%M%S).log
 ```
 
-Calls TAMUS AI API (`protected.o4-mini`) to label ~22,000 reasoning slices (10% of OpenR1-Math-220k). Allow up to 8 hours.
+Detach without killing: `Ctrl+A` then `D`. Re-attach: `screen -r sft_build`.
 
-**How to monitor:**
-```bash
-squeue -u $USER          # check job status (PD=pending, R=running)
-tail -f logs/<jobid>_build_sft.log   # live log output
-```
+Allow up to 8 hours (~28k API calls across ~9k sampled examples).
 
 **How to verify it succeeded:**
 
-The log should end with:
+The script prints when done:
 ```
-Done at <timestamp>
+Wrote XXXX rows to data/discriminator_sft.jsonl
 ```
 
 Check that the output file exists and is non-empty:
@@ -313,7 +324,7 @@ wc -l data/discriminator_sft.jsonl
 # Expect: several thousand lines (one JSON object per labeled slice)
 ```
 
-If the file is missing or empty, check the log for API errors or `TAMUS_AI_CHAT_API_KEY` not found.
+If empty or missing, check the log for `APIConnectionError` (network issue) or `TAMUS_AI_CHAT_API_KEY not found` (key not set in `~/.bashrc`).
 
 ---
 
