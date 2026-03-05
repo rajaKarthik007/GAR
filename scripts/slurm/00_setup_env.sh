@@ -7,7 +7,7 @@
 #   - You are in your project directory on SCRATCH (e.g. cd $SCRATCH/gar)
 #   - Your TAMUS API key is ready to add to ~/.bashrc
 
-set -euo pipefail
+set -eo pipefail
 
 PROJECT_DIR="$(pwd)"
 ENV_PREFIX="$SCRATCH/conda_envs/gar_env"

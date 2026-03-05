@@ -6,7 +6,7 @@
 # Run interactively from your project directory:
 #   bash scripts/slurm/01_download_models.sh
 
-set -euo pipefail
+set -eo pipefail
 
 export HF_HOME="$SCRATCH/hf_cache"
 mkdir -p "$HF_HOME"
