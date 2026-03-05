@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from openai import OpenAI
-from openai import APIStatusError
 
 from gar.parsing import parse_yes_no
 
@@ -64,28 +63,17 @@ def label_slice_with_openai(client: OpenAI, question: str, slice_text: str, mode
         "Assess logical soundness."
     )
 
-    try:
-        rsp = client.responses.create(
-            model=model,
-            input=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": prompt},
-            ],
-        )
-        raw = rsp.output_text.strip()
-    except APIStatusError as e:
-        # TAMUS OpenAI-compatible endpoints often support /chat/completions but not /responses.
-        if e.status_code != 405:
-            raise
-        chat_rsp = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.0,
-        )
-        raw = _extract_chat_text(chat_rsp)
+    # Use chat.completions — universally supported by OpenAI and all compatible proxies
+    # (the newer responses API is not reliably supported by all endpoints).
+    chat_rsp = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.0,
+    )
+    raw = _extract_chat_text(chat_rsp)
 
     verdict = parse_yes_no(raw)
 
