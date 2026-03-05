@@ -13,8 +13,9 @@ ENV_PREFIX="$SCRATCH/conda_envs/gar_env"
 ml purge
 ml GCCcore/13.3.0
 ml Miniconda3/23.10.0-1
+ml CUDA/12.4.0
+ml cuDNN/9.4.0.58-CUDA-12.3.0
 
-# Initialize conda shell functions (required in non-interactive scripts).
 source "$(conda info --base)/etc/profile.d/conda.sh"
 
 echo "=== Creating conda environment at $ENV_PREFIX ==="
@@ -26,10 +27,8 @@ fi
 
 conda activate "$ENV_PREFIX"
 
-# Install PyTorch via conda so cuDNN is bundled inside the env (avoids
-# libcudnn.so not found errors on clusters where cuDNN is not in LD_LIBRARY_PATH).
-echo "=== Installing PyTorch with CUDA 12.1 (conda-bundled cuDNN) ==="
-conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia -y
+echo "=== Installing PyTorch with CUDA 12.4 ==="
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 
 echo "=== Installing project dependencies ==="
 cd "$PROJECT_DIR"
