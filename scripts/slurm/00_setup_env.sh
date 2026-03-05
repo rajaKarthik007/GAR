@@ -18,12 +18,18 @@ ml Miniconda3/23.10.0-1
 source "$(conda info --base)/etc/profile.d/conda.sh"
 
 echo "=== Creating conda environment at $ENV_PREFIX ==="
-conda create --prefix "$ENV_PREFIX" python=3.10 -y
+if [ ! -d "$ENV_PREFIX" ]; then
+    conda create --prefix "$ENV_PREFIX" python=3.10 -y
+else
+    echo "Environment already exists, skipping creation."
+fi
 
 conda activate "$ENV_PREFIX"
 
-echo "=== Installing PyTorch with CUDA 12.1 ==="
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+# Install PyTorch via conda so cuDNN is bundled inside the env (avoids
+# libcudnn.so not found errors on clusters where cuDNN is not in LD_LIBRARY_PATH).
+echo "=== Installing PyTorch with CUDA 12.1 (conda-bundled cuDNN) ==="
+conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia -y
 
 echo "=== Installing project dependencies ==="
 cd "$PROJECT_DIR"
