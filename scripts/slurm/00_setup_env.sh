@@ -27,12 +27,14 @@ fi
 
 conda activate "$ENV_PREFIX"
 
+# Use the explicit env pip to avoid accidentally using the system pip
+PIP="$ENV_PREFIX/bin/pip"
+
 echo "=== Installing PyTorch with CUDA 12.1 (compatible with CUDA 12.3 runtime) ==="
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+"$PIP" install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 
 echo "=== Installing project dependencies ==="
-cd "$PROJECT_DIR"
-pip install -e "."
+"$PIP" install -e "$PROJECT_DIR"
 
 echo ""
 echo "=== Setup complete! ==="
