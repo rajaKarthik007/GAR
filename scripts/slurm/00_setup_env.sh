@@ -13,7 +13,7 @@ ENV_PREFIX="$SCRATCH/conda_envs/gar_env"
 ml purge
 ml GCCcore/13.3.0
 ml Miniconda3/23.10.0-1
-ml CUDA/12.4.0
+ml CUDA/12.3.0
 ml cuDNN/9.4.0.58-CUDA-12.3.0
 
 source "$(conda info --base)/etc/profile.d/conda.sh"
@@ -27,8 +27,8 @@ fi
 
 conda activate "$ENV_PREFIX"
 
-echo "=== Installing PyTorch with CUDA 12.4 ==="
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+echo "=== Installing PyTorch with CUDA 12.1 (compatible with CUDA 12.3 runtime) ==="
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 
 echo "=== Installing project dependencies ==="
 cd "$PROJECT_DIR"

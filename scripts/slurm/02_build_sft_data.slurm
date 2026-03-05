@@ -19,7 +19,7 @@ export HF_HOME="$SCRATCH/hf_cache"
 ml purge
 ml GCCcore/13.3.0
 ml Miniconda3/23.10.0-1
-ml CUDA/12.4.0
+ml CUDA/12.3.0
 ml cuDNN/9.4.0.58-CUDA-12.3.0
 
 source "$(conda info --base)/etc/profile.d/conda.sh"
