@@ -155,7 +155,9 @@ The script:
 
 ```bash
 # Evaluate the trained reasoner
-au
+python scripts/eval_math.py \
+  --config configs/qwen_gar.yaml \
+  --input data/eval_comprehensive.jsonl
 
 # Evaluate the base model for comparison
 python scripts/eval_math.py \
@@ -180,7 +182,7 @@ Options:
 
 ---
 
-## Part 2: Running on a GPU Cluster
+## Part 2: Running on a GPU Cluster (TAMU FASTER)
 
 Use `configs/qwen_gar_paper.yaml` for paper-scale hyperparameters.
 
@@ -193,48 +195,95 @@ Use `configs/qwen_gar_paper.yaml` for paper-scale hyperparameters.
 | dtype | float32 (MPS forces this) | bfloat16 |
 | SFT data ratio | 0.5% | 10% |
 | SFT max steps | 30 | 500 |
-| SFT batch (global) | 1 | 128 (4 per GPU x 4 grad_accum x 8 GPUs) |
+| SFT batch (global) | 1 | 128 (4 per GPU × 4 grad_accum × 8 GPUs) |
 | SFT learning rate | 5e-5 | 1e-4 |
 | Joint training max steps | 20 | 400 |
-| Joint training batch (global) | 1 | 192 (1 per GPU x 24 grad_accum x 8 GPUs) |
+| Joint training batch (global) | 1 | 192 (1 per GPU × 24 grad_accum × 8 GPUs) |
 | Num generations | 2 | 4 |
 | Max reasoner tokens | 128 | 2048 |
 | Max discriminator tokens | 64 | 128 |
 | Reward lambdas | λ1=λ2=λ3=1, λ4=0.5 | λ1=λ2=λ3=1, λ4=0.5 |
 
-### Target Cluster: TAMU FASTER
+### Cluster Details
 
-The SLURM scripts in `scripts/slurm/` are written for TAMU's FASTER cluster and target the single node with **8× A100 GPUs** (the node listed as `gpu:a100:8` with 1005 GB RAM). All work must live under `$SCRATCH`.
+Scripts target TAMU's FASTER cluster:
+- **GPU node**: `gpu:a100:8` (8× A100 80GB, 1005 GB RAM)
+- **Modules used**: `CUDA/12.3.0` + `cuDNN/9.4.0.58-CUDA-12.3.0` (loading the cuDNN module automatically pins CUDA to 12.3)
+- **PyTorch**: `torch==2.5.1+cu121` (cu121 wheel is forward-compatible with CUDA 12.3 runtime)
+- **All work must live under `$SCRATCH`** — home directory has a small quota that will be exceeded by model weights
 
-### Step 0: One-time Environment Setup (login node)
+All SLURM scripts use explicit binary paths (`$SCRATCH/conda_envs/gar_env/bin/python`, `…/bin/torchrun`) rather than relying on `conda activate` to update `PATH` in non-interactive shells.
+
+---
+
+### Step 0: One-time Environment Setup
+
+Run **once** on the login node from your project directory:
 
 ```bash
-# Clone the repo into SCRATCH and run the setup script once
 cd $SCRATCH
 git clone <your-github-repo-url> gar
-cd gar
+cd $SCRATCH/gar
 bash scripts/slurm/00_setup_env.sh
 ```
 
-The script creates a conda environment at `$SCRATCH/conda_envs/gar_env` and installs all dependencies including PyTorch with CUDA 12.1.
+This creates `$SCRATCH/conda_envs/gar_env` with Python 3.10, installs PyTorch (cu121), and installs the project package.
 
-After it completes, add your TAMUS AI API key to `~/.bashrc` so SLURM jobs can read it:
+**How to verify it succeeded:**
+```bash
+$SCRATCH/conda_envs/gar_env/bin/python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
+# Expected: 2.5.1+cu121 False
+# (False is correct on the login node — it has no GPU)
+
+$SCRATCH/conda_envs/gar_env/bin/python -c "import gar; print('gar OK')"
+# Expected: gar OK
+```
+
+If either import fails, re-run `bash scripts/slurm/00_setup_env.sh` — the script skips env creation if it already exists but always re-runs the pip installs.
+
+After setup, add your TAMUS AI API key to `~/.bashrc` (needed for Step 2):
 
 ```bash
 echo 'export TAMUS_AI_CHAT_API_KEY=<your-key-here>' >> ~/.bashrc
 source ~/.bashrc
+echo $TAMUS_AI_CHAT_API_KEY   # should print the key, not empty
 ```
 
-### Step 1: Pre-download Models and Dataset (login node)
+---
 
-Compute nodes may not have outbound internet access, so download everything from the login node first:
+### Step 1: Pre-download Models and Dataset
+
+Compute nodes typically don't have outbound internet access. Download everything from the login node first:
 
 ```bash
 cd $SCRATCH/gar
 bash scripts/slurm/01_download_models.sh
 ```
 
-This caches DeepSeek-R1-Distill-Qwen-7B, DeepSeek-R1-Distill-Qwen-1.5B, and OpenR1-Math-220k to `$SCRATCH/hf_cache`. All SLURM jobs set `HF_HOME=$SCRATCH/hf_cache` so the models are loaded from there.
+Downloads ~15 GB total to `$SCRATCH/hf_cache`:
+- `DeepSeek-R1-Distill-Qwen-7B` (~15 GB)
+- `DeepSeek-R1-Distill-Qwen-1.5B` (~3 GB)
+- `OpenR1-Math-220k` dataset (~2 GB)
+
+**How to verify it succeeded:**
+
+The script prints a success line for each download:
+```
+Reasoner downloaded.
+Discriminator downloaded.
+Dataset downloaded.
+=== All downloads complete. Models cached at: /scratch/user/<you>/hf_cache ===
+```
+
+If you see `ModuleNotFoundError` for `transformers` or `datasets`, the wrong Python was used — check that `$SCRATCH/conda_envs/gar_env/bin/python` exists and that `git pull` picked up the latest `01_download_models.sh`.
+
+You can also confirm the cache exists:
+```bash
+ls $SCRATCH/hf_cache/models--deepseek-ai--DeepSeek-R1-Distill-Qwen-7B/
+# Should show: blobs/  refs/  snapshots/
+```
+
+---
 
 ### Step 2: Build Discriminator SFT Data
 
@@ -243,42 +292,138 @@ cd $SCRATCH/gar
 sbatch scripts/slurm/02_build_sft_data.slurm
 ```
 
-Calls the TAMUS AI API (`protected.o4-mini`) to label ~22,000 reasoning slices (10% of OpenR1-Math-220k). Reads `TAMUS_AI_CHAT_API_KEY` from the environment set in your `.bashrc`. Output: `data/discriminator_sft.jsonl`. Allow up to 8 hours.
+Calls TAMUS AI API (`protected.o4-mini`) to label ~22,000 reasoning slices (10% of OpenR1-Math-220k). Allow up to 8 hours.
 
-### Step 3: Train Discriminator SFT
+**How to monitor:**
+```bash
+squeue -u $USER          # check job status (PD=pending, R=running)
+tail -f logs/<jobid>_build_sft.log   # live log output
+```
+
+**How to verify it succeeded:**
+
+The log should end with:
+```
+Done at <timestamp>
+```
+
+Check that the output file exists and is non-empty:
+```bash
+wc -l data/discriminator_sft.jsonl
+# Expect: several thousand lines (one JSON object per labeled slice)
+```
+
+If the file is missing or empty, check the log for API errors or `TAMUS_AI_CHAT_API_KEY` not found.
+
+---
+
+### Step 3: Train Discriminator (SFT)
 
 ```bash
 cd $SCRATCH/gar
+# Only submit after Step 2's output file exists
 sbatch scripts/slurm/03_train_discriminator_sft.slurm
 ```
 
-Fine-tunes DeepSeek-R1-Distill-Qwen-1.5B using HuggingFace Trainer with PyTorch DDP across 8 A100s via `torchrun`. Global batch = 4 × 4 × 8 = 128. 500 steps, ~30–60 minutes.
+Fine-tunes `DeepSeek-R1-Distill-Qwen-1.5B` with HuggingFace Trainer + PyTorch DDP across 8 A100s via `torchrun`. Global batch = 4 × 4 × 8 = 128. 500 steps, ~30–60 minutes.
 
-Output: `checkpoints/discriminator/`
+**How to monitor:**
+```bash
+squeue -u $USER
+tail -f logs/<jobid>_disc_sft.log
+```
+
+**How to verify it succeeded:**
+
+The log should show HuggingFace Trainer progress and end with:
+```
+Done at <timestamp>
+```
+
+Check that the checkpoint directory was created:
+```bash
+ls checkpoints/discriminator/
+# Expect: config.json  model.safetensors (or pytorch_model.bin)  tokenizer.json  etc.
+```
+
+If the job fails immediately (exit code non-zero within seconds), it's usually a DDP init issue — check the log for `NCCL` or `RuntimeError` lines.
+
+---
 
 ### Step 4: Joint GAR Training
 
 ```bash
 cd $SCRATCH/gar
+# Only submit after Step 3's checkpoint directory exists
 sbatch scripts/slurm/04_train_gar.slurm
 ```
 
-Co-trains the reasoner (7B) and discriminator (1.5B) with GRPO via PyTorch DDP across 8 A100s. Each GPU holds both models independently and processes its own batch; gradients are synced by DDP on each backward pass. Global batch = 1 × 24 × 8 = 192. 400 steps, allow up to 24 hours.
+Co-trains the reasoner (7B) and discriminator (1.5B) with GRPO via PyTorch DDP across 8 A100s. Each GPU holds both models and processes its own mini-batch; DDP syncs gradients on each backward pass. Global batch = 1 × 24 × 8 = 192. 400 steps, allow up to 24 hours.
 
-Output: `checkpoints/reasoner/` and `checkpoints/discriminator/`
+**How to monitor:**
+```bash
+squeue -u $USER
+tail -f logs/<jobid>_train_gar.log
+```
+
+Look for per-step log lines like:
+```
+Step 1/400 | r_loss=... | d_loss=... | reward=...
+```
+
+**How to verify it succeeded:**
+
+Log ends with:
+```
+Done at <timestamp>
+```
+
+Check checkpoints exist:
+```bash
+ls checkpoints/reasoner/    # model weights + tokenizer
+ls checkpoints/discriminator/   # updated discriminator weights
+```
+
+If the job crashes with OOM, see the "Adjusting for Fewer GPUs" table below and reduce `--nproc_per_node` or increase `gradient_accumulation_steps` in the config.
+
+---
 
 ### Step 5: Evaluate
 
 ```bash
 cd $SCRATCH/gar
+# Only submit after Step 4's reasoner checkpoint exists
 sbatch scripts/slurm/05_eval.slurm
 ```
 
-Runs Pass@1 evaluation on `data/eval_comprehensive.jsonl` with 30 samples per question and max 32768 tokens. Evaluates both the GAR-trained reasoner and the base model for comparison. Single A100, allow up to 8 hours.
+Runs Pass@1 on `data/eval_comprehensive.jsonl` with 30 samples per question and max 32,768 tokens. Evaluates both the GAR-trained reasoner and the base `DeepSeek-R1-Distill-Qwen-7B` for comparison. Single A100, allow up to 8 hours.
+
+**How to monitor:**
+```bash
+squeue -u $USER
+tail -f logs/<jobid>_eval.log
+```
+
+**How to verify it succeeded:**
+
+The log prints accuracy after each model:
+```
+=== Evaluating GAR-trained reasoner at <timestamp> ===
+...
+Pass@1: 0.XX
+=== Evaluating base model (DeepSeek-R1-Distill-Qwen-7B) at <timestamp> ===
+...
+Pass@1: 0.XX
+Done at <timestamp>
+```
+
+Compare your results against the paper's Table 1 (see Paper Results section below).
+
+---
 
 ### Adjusting for Fewer GPUs
 
-If you have fewer than 8 A100s, keep the global batch size constant by adjusting `gradient_accumulation_steps`:
+If you have fewer than 8 A100s, keep the global batch size constant by adjusting `gradient_accumulation_steps` in `configs/qwen_gar_paper.yaml` and `--nproc_per_node` + `--gres=gpu:a100:N` in the SLURM scripts:
 
 | GPUs | `per_device_batch_size` | `gradient_accumulation_steps` | Global batch |
 |------|------------------------|-------------------------------|--------------|
@@ -286,8 +431,6 @@ If you have fewer than 8 A100s, keep the global batch size constant by adjusting
 | 4    | 1                      | 48                            | 192          |
 | 2    | 1                      | 96                            | 192          |
 | 1    | 1                      | 192                           | 192          |
-
-Also update `--nproc_per_node` in the SLURM scripts and `--gres=gpu:a100:N` accordingly.
 
 ---
 
