@@ -17,9 +17,10 @@ ml cuDNN/9.4.0.58-CUDA-12.3.0
 
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate "$SCRATCH/conda_envs/gar_env"
+PYTHON="$SCRATCH/conda_envs/gar_env/bin/python"
 
 echo "=== Downloading DeepSeek-R1-Distill-Qwen-7B (reasoner) ==="
-python -c "
+"$PYTHON" -c "
 from transformers import AutoModelForCausalLM, AutoTokenizer
 AutoTokenizer.from_pretrained('deepseek-ai/DeepSeek-R1-Distill-Qwen-7B')
 AutoModelForCausalLM.from_pretrained('deepseek-ai/DeepSeek-R1-Distill-Qwen-7B')
@@ -27,7 +28,7 @@ print('Reasoner downloaded.')
 "
 
 echo "=== Downloading DeepSeek-R1-Distill-Qwen-1.5B (discriminator) ==="
-python -c "
+"$PYTHON" -c "
 from transformers import AutoModelForCausalLM, AutoTokenizer
 AutoTokenizer.from_pretrained('deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B')
 AutoModelForCausalLM.from_pretrained('deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B')
@@ -35,7 +36,7 @@ print('Discriminator downloaded.')
 "
 
 echo "=== Downloading OpenR1-Math-220k dataset ==="
-python -c "
+"$PYTHON" -c "
 from datasets import load_dataset
 load_dataset('open-r1/OpenR1-Math-220k', split='train')
 print('Dataset downloaded.')

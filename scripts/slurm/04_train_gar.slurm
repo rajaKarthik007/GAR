@@ -25,13 +25,14 @@ ml cuDNN/9.4.0.58-CUDA-12.3.0
 
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate "$SCRATCH/conda_envs/gar_env"
+TORCHRUN="$SCRATCH/conda_envs/gar_env/bin/torchrun"
 cd "$SLURM_SUBMIT_DIR"
 mkdir -p logs checkpoints
 
 echo "Starting GAR training on 8x A100 at $(date)"
 echo "Node: $(hostname), GPUs: $CUDA_VISIBLE_DEVICES"
 
-torchrun \
+"$TORCHRUN" \
     --nproc_per_node=8 \
     --master_port=29501 \
     scripts/train_gar.py \

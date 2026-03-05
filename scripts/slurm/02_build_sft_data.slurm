@@ -24,12 +24,13 @@ ml cuDNN/9.4.0.58-CUDA-12.3.0
 
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate "$SCRATCH/conda_envs/gar_env"
+PYTHON="$SCRATCH/conda_envs/gar_env/bin/python"
 cd "$SLURM_SUBMIT_DIR"
 mkdir -p logs data
 
 echo "Starting SFT data build at $(date)"
 
-python scripts/build_discriminator_sft_data.py \
+"$PYTHON" scripts/build_discriminator_sft_data.py \
     --config configs/qwen_gar_paper.yaml \
     --api_base https://chat-api.tamu.ai/api \
     --api_key_env TAMUS_AI_CHAT_API_KEY \

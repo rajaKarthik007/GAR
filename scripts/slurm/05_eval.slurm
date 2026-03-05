@@ -24,18 +24,19 @@ ml cuDNN/9.4.0.58-CUDA-12.3.0
 
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate "$SCRATCH/conda_envs/gar_env"
+PYTHON="$SCRATCH/conda_envs/gar_env/bin/python"
 cd "$SLURM_SUBMIT_DIR"
 mkdir -p logs
 
 echo "=== Evaluating GAR-trained reasoner at $(date) ==="
-python scripts/eval_math.py \
+"$PYTHON" scripts/eval_math.py \
     --config configs/qwen_gar_paper.yaml \
     --input data/eval_comprehensive.jsonl \
     --max_tokens 32768 \
     --num_samples 30
 
 echo "=== Evaluating base model (DeepSeek-R1-Distill-Qwen-7B) at $(date) ==="
-python scripts/eval_math.py \
+"$PYTHON" scripts/eval_math.py \
     --config configs/qwen_gar_paper.yaml \
     --input data/eval_comprehensive.jsonl \
     --model deepseek-ai/DeepSeek-R1-Distill-Qwen-7B \
