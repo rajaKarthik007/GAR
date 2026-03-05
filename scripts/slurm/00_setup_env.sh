@@ -7,15 +7,15 @@
 #   - You are in your project directory on SCRATCH (e.g. cd $SCRATCH/gar)
 #   - Your TAMUS API key is ready to add to ~/.bashrc
 
-set -eo pipefail
-
 PROJECT_DIR="$(pwd)"
 ENV_PREFIX="$SCRATCH/conda_envs/gar_env"
 
 ml purge
 ml GCCcore/13.3.0
 ml Miniconda3/23.10.0-1
-source ~/.bashrc
+
+# Initialize conda shell functions (required in non-interactive scripts).
+source "$(conda info --base)/etc/profile.d/conda.sh"
 
 echo "=== Creating conda environment at $ENV_PREFIX ==="
 conda create --prefix "$ENV_PREFIX" python=3.10 -y
@@ -27,7 +27,7 @@ pip install torch torchvision torchaudio --index-url https://download.pytorch.or
 
 echo "=== Installing project dependencies ==="
 cd "$PROJECT_DIR"
-pip install -e ".[fullscale]"
+pip install -e "."
 
 echo ""
 echo "=== Setup complete! ==="

@@ -6,16 +6,14 @@
 # Run interactively from your project directory:
 #   bash scripts/slurm/01_download_models.sh
 
-set -eo pipefail
-
 export HF_HOME="$SCRATCH/hf_cache"
 mkdir -p "$HF_HOME"
 
 ml purge
 ml GCCcore/13.3.0
 ml Miniconda3/23.10.0-1
-source ~/.bashrc
 
+source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate "$SCRATCH/conda_envs/gar_env"
 
 echo "=== Downloading DeepSeek-R1-Distill-Qwen-7B (reasoner) ==="
@@ -43,4 +41,4 @@ print('Dataset downloaded.')
 
 echo ""
 echo "=== All downloads complete. Models cached at: $HF_HOME ==="
-echo "You can now submit jobs with: sbatch scripts/slurm/02_build_sft_data.sh"
+echo "You can now submit jobs with: sbatch scripts/slurm/02_build_sft_data.slurm"

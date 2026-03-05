@@ -19,8 +19,8 @@ export HF_HOME="$SCRATCH/hf_cache"
 ml purge
 ml GCCcore/13.3.0
 ml Miniconda3/23.10.0-1
-source ~/.bashrc
 
+source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate "$SCRATCH/conda_envs/gar_env"
 cd "$SLURM_SUBMIT_DIR"
 mkdir -p logs
