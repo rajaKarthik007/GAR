@@ -483,3 +483,8 @@ Johns Hopkins University
 | AMC23 | 90.3 | 92.5 (+2.2) |
 | OlympiadBench | 52.5 | 54.8 (+2.3) |
 | LiveMathBench-Hard | 18.4 | 24.9 (+6.5) |
+
+
+
+
+RAJA KARTHIK VOBUGARI
