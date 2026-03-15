@@ -1,9 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=sft_neg
 #SBATCH --ntasks=1
-#SBATCH --nodelist=fc098
-#SBATCH --gres=gpu:a40:4
-#SBATCH --mem=400G
+#SBATCH --gres=gpu:a40:2
+#SBATCH --mem=200G
 #SBATCH --time=4:00:00
 #SBATCH --output=logs/%j_sft_neg.log
 
@@ -38,6 +37,6 @@ echo "Node: $(hostname), GPU: $CUDA_VISIBLE_DEVICES"
     --api_base https://chat-api.tamu.ai/api \
     --api_key_env TAMUS_AI_CHAT_API_KEY \
     --openai_model protected.o4-mini \
-    --batch_size 4
+    --batch_size 2
 
 echo "Done at $(date)"
