@@ -48,7 +48,8 @@ def cosine_lr(step: int, total_steps: int, warmup_steps: int, max_lr: float, min
     return min_lr + (max_lr - min_lr) * cosine
 
 
-def chunked(xs: list, n: int) -> list[list]:
+from typing import Any, List
+def chunked(xs: List[Any], n: int) -> List[List[Any]]:
     return [xs[i : i + n] for i in range(0, len(xs), n)]
 
 
@@ -90,6 +91,18 @@ def main() -> None:
     # Keep references to the raw models for generation and checkpoint saving.
     raw_reasoner = reasoner_bundle.model
     raw_discriminator = discriminator_bundle.model
+
+    # Load frozen reference reasoner for GRPO KL penalty computation
+    ref_reasoner_bundle = load_causal_lm(
+        cfg.models.reasoner_name,
+        dtype=cfg.runtime.dtype,
+        device=cfg.runtime.device,
+        use_mps_if_available=cfg.runtime.use_mps_if_available,
+        trust_remote_code=cfg.runtime.trust_remote_code,
+    )
+    ref_reasoner = ref_reasoner_bundle.model
+    ref_reasoner.eval()
+    ref_reasoner.requires_grad_(False)
 
     # Enable gradient checkpointing to reduce peak memory on MPS and CUDA.
     if raw_reasoner.device.type in ("mps", "cuda"):
@@ -229,7 +242,13 @@ def main() -> None:
 
         # Use DDP-wrapped reasoner so gradients are synced across GPUs on backward.
         logp = generated_logprobs(reasoner, reasoner_tok, flat_prompts, flat_completions)
-        reasoner_loss = -(adv * logp).mean()
+        with torch.no_grad():
+            ref_logp = generated_logprobs(ref_reasoner, reasoner_tok, flat_prompts, flat_completions)
+            
+        # Standard GRPO KL penalty approximation
+        beta = 0.04
+        kl_penalty = logp - ref_logp
+        reasoner_loss = -(adv * logp - beta * kl_penalty).mean()
 
         ref_slices = []
         for ex in batch:
@@ -240,7 +259,10 @@ def main() -> None:
         gen_slices = [s for gs in grouped_gen_slices for s in gs]
         n_pair = min(len(ref_slices), len(gen_slices))
         if n_pair == 0:
-            discriminator_loss = torch.tensor(0.0, device=raw_discriminator.device)
+            # DDP Deadlock Fix: We MUST call forward on the DDP wrapper even when loss is 0.
+            dummy_prompt = discriminator_real_fake_prompt("dummy", discr_tok)
+            prob_ref = yes_probability(discriminator, discr_tok, [dummy_prompt])
+            discriminator_loss = 0.0 * prob_ref.sum()
         else:
             ref_subset = random.sample(ref_slices, n_pair)
             gen_subset = random.sample(gen_slices, n_pair)
@@ -297,8 +319,8 @@ def main() -> None:
 
         if is_main and (step + 1) % cfg.logging.log_every == 0:
             print(
-                f"step={step+1} lr={lr:.2e} total_loss={loss.item():.4f} "
-                f"reasoner_loss={reasoner_loss.item():.4f} discriminator_loss={discriminator_loss.item():.4f}"
+                f"step={step+1} lr={lr:.2e} total_loss={float(loss):.4f} "
+                f"reasoner_loss={float(reasoner_loss):.4f} discriminator_loss={float(discriminator_loss):.4f}"
             )
 
         if is_main and (step + 1) % cfg.logging.save_every == 0:

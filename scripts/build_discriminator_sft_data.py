@@ -76,30 +76,65 @@ def main() -> None:
         client = OpenAI(api_key=api_key, base_url=args.api_base)
     else:
         client = OpenAI(api_key=api_key)
-    rows = []
+    from gar.modeling import load_causal_lm, generate_text
+    from gar.prompts import reasoner_prompt
+    from gar.parsing import extract_think_answer, exact_match
 
-    for ex in tqdm(sampled, desc="Labeling slices"):
-        # Local/debug robustness: many datasets store reasoning in the solution/answer field.
-        trace = ex.reasoning if ex.reasoning and ex.reasoning.strip() else ex.answer
-        if not trace or not trace.strip():
-            continue
+    reasoner = load_causal_lm(
+        cfg.models.reasoner_name,
+        dtype=cfg.runtime.dtype,
+        device=cfg.runtime.device,
+        use_mps_if_available=cfg.runtime.use_mps_if_available,
+        trust_remote_code=cfg.runtime.trust_remote_code,
+    )
+
+    traces_to_label = []
+    
+    # Generate some incorrect traces to balance the dataset natively
+    print("Generating responses from the reasoner to find incorrect reasoning traces...")
+    for i in tqdm(range(0, len(sampled), cfg.training.per_device_batch_size)):
+        chunk = sampled[i:i + cfg.training.per_device_batch_size]
+        prompts = [reasoner_prompt(ex.question, reasoner.tokenizer) for ex in chunk]
+        completions = generate_text(reasoner.model, reasoner.tokenizer, prompts, max_new_tokens=cfg.training.max_reasoner_tokens)
+        
+        for ex, comp in zip(chunk, completions):
+            think, answer = extract_think_answer(comp)
+            # Add ground truth trace (likely YES)
+            gt_trace = ex.reasoning if ex.reasoning and ex.reasoning.strip() else ex.answer
+            if gt_trace and gt_trace.strip():
+                traces_to_label.append((ex.question, gt_trace))
+            
+            # Add generated trace if it led to an incorrect answer (likely NO)
+            if exact_match(answer, ex.answer) == 0:
+                if think and think.strip():
+                    traces_to_label.append((ex.question, think))
+
+    # Free memory if on MPS
+    if cfg.runtime.device == "mps" or cfg.runtime.use_mps_if_available:
+        import torch
+        if torch.backends.mps.is_available():
+            torch.mps.empty_cache()
+
+    rows = []
+    for q, trace in tqdm(traces_to_label, desc="Labeling slices"):
         slices = segment_reasoning(trace, tokenizer, slice_cfg)
         for s in slices:
-            lbl = label_slice_with_openai(client, ex.question, s, model=args.openai_model)
+            lbl = label_slice_with_openai(client, q, s, model=args.openai_model)
             target = f"{lbl.analysis}\n\n{'**YES**' if lbl.yes_no else '**NO**'}\n\n{lbl.rationale}".strip()
             rows.append(
                 {
-                    "question": ex.question,
+                    "question": q,
                     "slice": s,
                     "label": lbl.yes_no,
-                    "prompt": discriminator_slice_prompt(ex.question, s, tokenizer),
+                    "prompt": discriminator_slice_prompt(q, s, tokenizer),
                     "target": target,
                 }
             )
 
-    by_label = defaultdict(list)
+    from typing import Dict, List, Any
+    by_label: Dict[int, List[Dict[str, Any]]] = defaultdict(list)
     for r in rows:
-        by_label[r["label"]].append(r)
+        by_label[int(r["label"])].append(r)
 
     if len(rows) == 0:
         raise RuntimeError(
@@ -108,7 +143,6 @@ def main() -> None:
 
     n = min(len(by_label[0]), len(by_label[1]))
     if n == 0:
-        # FULL_SCALE_REVERT: for strict paper replication, keep a 1:1 class ratio.
         print(
             "Warning: could not build 1:1 YES/NO balance (one class is missing). "
             "Proceeding with unbalanced local SFT data."

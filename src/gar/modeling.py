@@ -158,8 +158,7 @@ def generated_logprobs(
                 mask[j, start:] = 1.0
 
         summed = (token_logp * mask).sum(dim=1)
-        denom = mask.sum(dim=1).clamp_min(1.0)
-        outputs.append(summed / denom)
+        outputs.append(summed)
 
     return torch.cat(outputs, dim=0)
 
