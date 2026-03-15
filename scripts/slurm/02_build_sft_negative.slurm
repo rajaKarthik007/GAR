@@ -3,7 +3,7 @@
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:a40:2
 #SBATCH --mem=200G
-#SBATCH --time=4:00:00
+#SBATCH --time=8:00:00
 #SBATCH --output=logs/%j_sft_neg.log
 
 #
