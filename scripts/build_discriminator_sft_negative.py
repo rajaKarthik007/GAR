@@ -50,6 +50,12 @@ def parse_args() -> argparse.Namespace:
         default="OPENAI_API_KEY",
         help="Environment variable containing the API key",
     )
+    p.add_argument(
+        "--batch_size",
+        type=int,
+        default=None,
+        help="Override batch size for generation (default: use config value)",
+    )
     return p.parse_args()
 
 
@@ -105,9 +111,11 @@ def main() -> None:
 
     # Generate incorrect reasoning traces from reasoner
     print("Generating responses from reasoner to find incorrect reasoning traces...")
+    batch_size = args.batch_size if args.batch_size else cfg.training.per_device_batch_size
+    print(f"Using batch size: {batch_size}", flush=True)
     traces_to_label = []
-    for i in tqdm(range(0, len(sampled), cfg.training.per_device_batch_size)):
-        chunk = sampled[i : i + cfg.training.per_device_batch_size]
+    for i in tqdm(range(0, len(sampled), batch_size)):
+        chunk = sampled[i : i + batch_size]
         prompts = [reasoner_prompt(ex.question, reasoner.tokenizer) for ex in chunk]
         completions = generate_text(
             reasoner.model,
