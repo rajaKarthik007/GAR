@@ -20,20 +20,13 @@ conda activate "$SCRATCH/conda_envs/gar_env"
 PYTHON="$SCRATCH/conda_envs/gar_env/bin/python"
 
 echo "=== Downloading DeepSeek-R1-Distill-Qwen-7B (reasoner) ==="
-"$PYTHON" -c "
-from transformers import AutoModelForCausalLM, AutoTokenizer
-AutoTokenizer.from_pretrained('deepseek-ai/DeepSeek-R1-Distill-Qwen-7B')
-AutoModelForCausalLM.from_pretrained('deepseek-ai/DeepSeek-R1-Distill-Qwen-7B')
+"$PYTHON" -m pip install -q huggingface_hub
+"$PYTHON" -m huggingface_hub.cli download deepseek-ai/DeepSeek-R1-Distill-Qwen-7B
 print('Reasoner downloaded.')
-"
 
 echo "=== Downloading DeepSeek-R1-Distill-Qwen-1.5B (discriminator) ==="
-"$PYTHON" -c "
-from transformers import AutoModelForCausalLM, AutoTokenizer
-AutoTokenizer.from_pretrained('deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B')
-AutoModelForCausalLM.from_pretrained('deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B')
+"$PYTHON" -m huggingface_hub.cli download deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
 print('Discriminator downloaded.')
-"
 
 echo "=== Downloading OpenR1-Math-220k dataset ==="
 "$PYTHON" -c "
