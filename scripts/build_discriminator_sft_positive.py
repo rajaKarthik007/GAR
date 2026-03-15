@@ -52,19 +52,27 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    print("Starting Stage 2a: Extract positive traces...", flush=True)
     args = parse_args()
+    print(f"Args parsed. Config: {args.config}", flush=True)
     cfg = load_config(args.config)
+    print(f"Config loaded. Seed: {cfg.seed}", flush=True)
     set_seed(cfg.seed)
 
+    print("Loading tokenizer...", flush=True)
     tokenizer = AutoTokenizer.from_pretrained(cfg.models.discriminator_name, use_fast=True)
+    print("Tokenizer loaded.", flush=True)
+
     slice_cfg = SliceConfig(
         max_slice_tokens=cfg.slicing.max_slice_tokens,
         min_slice_tokens=cfg.slicing.min_slice_tokens,
         semantic_break_markers=tuple(cfg.slicing.semantic_break_markers),
     )
+    print("Slice config created.", flush=True)
 
     # Load and sample dataset
-    print("Loading dataset...")
+    print("Loading dataset...", flush=True)
+    print(f"Dataset name: {cfg.data.dataset_name}, split: {cfg.data.train_split}", flush=True)
     data = load_math_dataset(
         dataset_name=cfg.data.dataset_name,
         dataset_config=cfg.data.dataset_config,
@@ -75,10 +83,12 @@ def main() -> None:
         reasoning_keys=cfg.data.reasoning_key_candidates,
         max_examples=cfg.data.max_train_examples,
     )
+    print(f"Dataset loaded. Total examples: {len(data)}", flush=True)
     sampled = sample_ratio(data, cfg.data.sft_sample_ratio, cfg.seed)
-    print(f"Loaded {len(sampled)} sampled examples")
+    print(f"Loaded {len(sampled)} sampled examples", flush=True)
 
     # Set up OpenAI client
+    print(f"Setting up OpenAI client with key from {args.api_key_env}...", flush=True)
     api_key = os.getenv(args.api_key_env)
     if not api_key:
         raise RuntimeError(
@@ -86,10 +96,12 @@ def main() -> None:
             f"Set it before running this script."
         )
 
+    print(f"API key found. Base URL: {args.api_base}", flush=True)
     if args.api_base:
         client = OpenAI(api_key=api_key, base_url=args.api_base)
     else:
         client = OpenAI(api_key=api_key)
+    print("OpenAI client ready.", flush=True)
 
     # Extract ground-truth reasoning traces from dataset
     print("Extracting ground-truth reasoning traces...")
