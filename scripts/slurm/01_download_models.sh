@@ -22,11 +22,11 @@ PYTHON="$SCRATCH/conda_envs/gar_env/bin/python"
 echo "=== Downloading DeepSeek-R1-Distill-Qwen-7B (reasoner) ==="
 "$PYTHON" -m pip install -q huggingface_hub
 "$PYTHON" -m huggingface_hub.cli download deepseek-ai/DeepSeek-R1-Distill-Qwen-7B
-print('Reasoner downloaded.')
+echo "Reasoner downloaded."
 
 echo "=== Downloading DeepSeek-R1-Distill-Qwen-1.5B (discriminator) ==="
 "$PYTHON" -m huggingface_hub.cli download deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
-print('Discriminator downloaded.')
+echo "Discriminator downloaded."
 
 echo "=== Downloading OpenR1-Math-220k dataset ==="
 "$PYTHON" -c "

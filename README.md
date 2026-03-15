@@ -285,54 +285,115 @@ ls $SCRATCH/hf_cache/models--deepseek-ai--DeepSeek-R1-Distill-Qwen-7B/
 
 ---
 
-### Step 2: Build Discriminator SFT Data
+### Step 2: Build Discriminator SFT Data (3 stages)
 
-> **Run on the login node, not as a SLURM job.** This step calls the TAMUS AI API over the internet; compute nodes on FASTER do not have outbound internet access. The script needs no GPU — it is CPU-only.
+This step is split into 3 stages:
+1. **Stage 2a** (login node): Extract and label positive (ground-truth) traces — CPU-only
+2. **Stage 2b** (GPU node): Generate and label negative (incorrect model) traces — requires 1 A100
+3. **Stage 2c** (login node): Merge and balance final dataset — CPU-only
 
-Use `screen` or `tmux` so the job survives if your SSH session drops:
+Stages 2a and 2b can run in parallel (you can submit 2b while 2a is running).
+
+#### Stage 2a: Extract & Label Positive Samples (Login Node)
+
+Run on login node, CPU-only. Use `screen` or `tmux` so it survives if SSH drops:
 
 ```bash
-screen -S sft_build   # start a persistent session
+screen -S sft_pos   # start a persistent session
 
 cd $SCRATCH/gar
 export HF_HOME="$SCRATCH/hf_cache"
 export TRANSFORMERS_OFFLINE=1
 export HF_DATASETS_OFFLINE=1
 
-$SCRATCH/conda_envs/gar_env/bin/python scripts/build_discriminator_sft_data.py \
+$SCRATCH/conda_envs/gar_env/bin/python scripts/build_discriminator_sft_positive.py \
     --config configs/qwen_gar_paper.yaml \
     --api_base https://chat-api.tamu.ai/api \
     --api_key_env TAMUS_AI_CHAT_API_KEY \
     --openai_model protected.o4-mini \
-    2>&1 | tee logs/sft_build_$(date +%Y%m%d_%H%M%S).log
+    2>&1 | tee logs/sft_positive_$(date +%Y%m%d_%H%M%S).log
 ```
 
-Detach without killing: `Ctrl+A` then `D`. Re-attach: `screen -r sft_build`.
+Detach: `Ctrl+A` then `D`. Re-attach: `screen -r sft_pos`.
 
-Allow up to 8 hours (~28k API calls across ~9k sampled examples).
+**Expected time**: 1-2 hours (API-bound, not compute-bound)
 
-**How to verify it succeeded:**
-
-The script prints when done:
+**How to verify:**
+```bash
+wc -l data/discriminator_sft_positive.jsonl
+# Expect: several thousand lines
+head -1 data/discriminator_sft_positive.jsonl | python -m json.tool | head -20
 ```
-Wrote XXXX rows to data/discriminator_sft.jsonl
+
+#### Stage 2b: Generate & Label Negative Samples (GPU Node)
+
+Submit to GPU node (runs in parallel with 2a):
+
+```bash
+cd $SCRATCH/gar
+sbatch scripts/slurm/02_build_sft_negative.slurm
 ```
 
-Check that the output file exists and is non-empty:
+Monitor:
+```bash
+squeue -u $USER
+tail -f logs/<jobid>_sft_neg.log
+```
+
+**Expected time**: 1-2 hours
+
+**How to verify:**
+```bash
+# After job completes
+wc -l data/discriminator_sft_negative.jsonl
+# Expect: several thousand lines (may be fewer than positive if reasoner doesn't generate many wrong answers)
+```
+
+If the file is empty or missing, check the log for `APIConnectionError`.
+
+#### Stage 2c: Merge & Balance (Login Node)
+
+After both 2a and 2b complete, merge on login node:
+
+```bash
+cd $SCRATCH/gar
+export HF_HOME="$SCRATCH/hf_cache"
+
+$SCRATCH/conda_envs/gar_env/bin/python scripts/build_discriminator_sft_merge.py
+```
+
+**Expected output:**
+```
+Loaded XXXX positive slices
+Loaded YYYY negative slices
+Label distribution before balancing:
+  YES (label=1): AAAA
+  NO (label=0): BBBB
+Balancing to CCCC examples per class...
+Wrote DDDD balanced rows to data/discriminator_sft.jsonl
+Label distribution after balancing:
+  YES (label=1): CCCC
+  NO (label=0): CCCC
+```
+
+**How to verify:**
 ```bash
 wc -l data/discriminator_sft.jsonl
-# Expect: several thousand lines (one JSON object per labeled slice)
-```
+# Expect: roughly 2×CCCC lines (balanced 1:1)
 
-If empty or missing, check the log for `APIConnectionError` (network issue) or `TAMUS_AI_CHAT_API_KEY not found` (key not set in `~/.bashrc`).
+# Check label distribution
+python -c "import json; data = [json.loads(l) for l in open('data/discriminator_sft.jsonl')]; labels = [d['label'] for d in data]; print(f'YES: {sum(labels)}, NO: {len(labels)-sum(labels)}')"
+# Expect: roughly equal YES and NO counts
+```
 
 ---
 
 ### Step 3: Train Discriminator (SFT)
 
+Only submit after Step 2c (merge) completes and `data/discriminator_sft.jsonl` exists:
+
 ```bash
 cd $SCRATCH/gar
-# Only submit after Step 2's output file exists
 sbatch scripts/slurm/03_train_discriminator_sft.slurm
 ```
 
