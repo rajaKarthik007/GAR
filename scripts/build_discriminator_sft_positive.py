@@ -106,20 +106,28 @@ def main() -> None:
     # Extract ground-truth reasoning traces from dataset
     print("Extracting ground-truth reasoning traces...")
     traces_to_label = []
+    skipped_no_reasoning = 0
     for ex in tqdm(sampled):
-        gt_trace = ex.reasoning if ex.reasoning and ex.reasoning.strip() else ex.answer
-        if gt_trace and gt_trace.strip():
-            traces_to_label.append((ex.question, gt_trace))
+        # Only use examples with actual reasoning field (not fallback to answer)
+        if ex.reasoning and ex.reasoning.strip():
+            traces_to_label.append((ex.question, ex.reasoning))
+        else:
+            skipped_no_reasoning += 1
 
-    print(f"Extracted {len(traces_to_label)} positive traces")
+    print(f"Extracted {len(traces_to_label)} positive traces (skipped {skipped_no_reasoning} with missing reasoning)")
 
     # Label with OpenAI
     print("Labeling positive traces with OpenAI...")
     rows = []
+    debug_count = 0
     for q, trace in tqdm(traces_to_label, desc="Labeling slices"):
         slices = segment_reasoning(trace, tokenizer, slice_cfg)
         for s in slices:
-            lbl = label_slice_with_openai(client, q, s, model=args.openai_model)
+            # Enable debug logging for first few slices to diagnose label distribution
+            debug = debug_count < 5
+            lbl = label_slice_with_openai(client, q, s, model=args.openai_model, debug=debug)
+            if debug:
+                debug_count += 1
             target = f"{lbl.analysis}\n\n{'**YES**' if lbl.yes_no else '**NO**'}\n\n{lbl.rationale}".strip()
             rows.append(
                 {
@@ -139,6 +147,15 @@ def main() -> None:
             f.write(json.dumps(row) + "\n")
 
     print(f"Wrote {len(rows)} labeled positive slices to {output_path}")
+
+    # Report label distribution
+    labels = [r["label"] for r in rows]
+    yes_count = sum(labels)
+    no_count = len(labels) - yes_count
+    print(f"Label distribution: YES={yes_count}, NO={no_count}")
+    if len(labels) > 0:
+        print(f"  YES (label=1): {yes_count} ({100*yes_count/len(labels):.1f}%)")
+        print(f"  NO (label=0): {no_count} ({100*no_count/len(labels):.1f}%)")
 
 
 if __name__ == "__main__":

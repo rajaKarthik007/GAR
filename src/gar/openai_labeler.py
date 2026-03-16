@@ -56,7 +56,7 @@ def _extract_chat_text(chat_rsp: object) -> str:
     return str(chat_rsp).strip()
 
 
-def label_slice_with_openai(client: OpenAI, question: str, slice_text: str, model: str = "gpt-o4-mini") -> SliceLabel:
+def label_slice_with_openai(client: OpenAI, question: str, slice_text: str, model: str = "gpt-o4-mini", debug: bool = False) -> SliceLabel:
     prompt = (
         f"Question:\n{question}\n\n"
         f"Reasoning slice:\n{slice_text}\n\n"
@@ -76,6 +76,8 @@ def label_slice_with_openai(client: OpenAI, question: str, slice_text: str, mode
     raw = _extract_chat_text(chat_rsp)
 
     verdict = parse_yes_no(raw)
+    if debug:
+        print(f"[DEBUG] Slice: {slice_text[:50]}... -> Verdict: {verdict} -> Raw: {raw[:100]}...")
 
     lines = [ln.strip() for ln in raw.splitlines() if ln.strip()]
     analysis = lines[0] if lines else ""
