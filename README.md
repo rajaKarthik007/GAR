@@ -296,25 +296,23 @@ Stages 2a and 2b can run in parallel (you can submit 2b while 2a is running).
 
 #### Stage 2a: Extract & Label Positive Samples (Login Node)
 
-Run on login node, CPU-only. Use `screen` or `tmux` so it survives if SSH drops:
+Run on login node, CPU-only. Use `nohup` so it survives if SSH drops:
 
 ```bash
-screen -S sft_pos   # start a persistent session
-
 cd $SCRATCH/gar
 export HF_HOME="$SCRATCH/hf_cache"
 export TRANSFORMERS_OFFLINE=1
 export HF_DATASETS_OFFLINE=1
 
-$SCRATCH/conda_envs/gar_env/bin/python scripts/build_discriminator_sft_positive.py \
+nohup $SCRATCH/conda_envs/gar_env/bin/python scripts/build_discriminator_sft_positive.py \
     --config configs/qwen_gar_paper.yaml \
     --api_base https://chat-api.tamu.ai/api \
     --api_key_env TAMUS_AI_CHAT_API_KEY \
     --openai_model protected.o4-mini \
-    2>&1 | tee logs/sft_positive_$(date +%Y%m%d_%H%M%S).log
+    > logs/sft_positive_$(date +%Y%m%d_%H%M%S).log 2>&1 &
 ```
 
-Detach: `Ctrl+A` then `D`. Re-attach: `screen -r sft_pos`.
+Monitor with: `tail -f logs/sft_positive_<timestamp>.log`
 
 **Expected time**: 1-2 hours (API-bound, not compute-bound)
 
