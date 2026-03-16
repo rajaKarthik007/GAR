@@ -23,9 +23,9 @@ data:
   train_split: train
   eval_split: test
   local_jsonl: null
-  question_key_candidates: [question, problem, prompt, instruction]
-  answer_key_candidates: [answer, final_answer, solution]
-  reasoning_key_candidates: [cot, reasoning, thought, deepseek_thinking_trajectory]
+  question_key_candidates: [problem, question, prompt, instruction]
+  answer_key_candidates: [answer, final_answer]
+  reasoning_key_candidates: [solution, cot, reasoning, thought, deepseek_thinking_trajectory]
   sft_sample_ratio: 0.10
   sft_output_path: data/discriminator_sft.jsonl
   max_train_examples: null
